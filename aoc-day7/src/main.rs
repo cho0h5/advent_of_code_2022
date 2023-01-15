@@ -1,5 +1,5 @@
-fn main() {
-    let terminal_out = "$ cd /
+static terminal_output: &'static str = "
+$ cd /
 $ ls
 dir a
 14848514 b.txt
@@ -23,60 +23,68 @@ $ ls
 5626152 d.ext
 7214296 k";
 
-    resolve_directory(terminal_out);
-    // let mut disk = resolve_directory(terminal_out);
-    // println!("{:?}", disk);
-}
-
+#[derive(Debug)]
 struct File {
+    path: &'static str,
     name: &'static str,
     size: u32,
 }
 
-fn resolve_directory(terminal_out: &'static str)  {
-    use std::collections::HashMap;
-    let mut output = HashMap::new();
+struct Disk {
+    files: Vec<File>,
+    directories: Vec<&'static str>,
+}
 
-    let terminal_out: Vec<&str> = terminal_out.split("$ ").collect();
-    let terminal_out = &terminal_out[1..];
+fn main() {
+    resolve_directory(terminal_output);
+}
 
-    let mut current_path = vec!["/"];
-    for command_out in terminal_out {
-        let command_out: Vec<&str> = command_out.split("\n").collect();
-        if command_out[0].starts_with("cd") {
-            // cd
-            let path: Vec<&str> = command_out[0].clone().split(" ").collect();
-            let path = path[1];
-            match path {
-                "/" => {
-                    current_path.clear();
-                    current_path.push("/");
-                },
-                ".." => {
-                    current_path.pop();
-                }
-                name => {
-                    current_path.push(name);
-                }
-            }
-        } else {
-            // ls
-            println!("ls ({:?})", current_path);
-            let mut file_list = vec![];
-            for file in &command_out[1..] {
-                let file: Vec<&str> = file.split(" ").collect();
+fn resolve_directory(terminal_out: &'static str) -> Disk {
+    let mut output = Disk { files: vec![], directories: vec![] };
+    let mut current_path: Vec<&str> = vec![];
 
-                match file[0] {
-                    "dir" => (),
-                    size => {
-                        let size: u32 = size.parse().unwrap();
-
-                        println!("parse: {}", size);
-                        file_list.push(File { name: file[1], size: size });
+    fn process_command<'a>(path: &mut Vec<&'a str>, command: &'a str, outputs: &[&'static str]) -> () {
+        let command: Vec<&str> = command.split(" ").collect();
+        match command[0] {
+            "cd" => {
+                match command[1] {
+                    "/" => {
+                        path.clear();
+                        path.push("/");
                     },
+                    ".." => {
+                        path.pop();
+                    },
+                    _ => {
+                        path.push(command[1]);
+                    }
                 }
-            }
-            output.insert(current_path.join(" "), file_list);
+            },
+            "ls" => {
+                let path = path.join(" ");
+                println!("outputs: {:?}", outputs);
+                let mut files = vec![];
+                for output in outputs {
+                    let output: Vec<&str> = output.split(" ").collect();
+                    files.push(File { path: path.as_str(), name: output[1], size: output[2].parse().unwrap()});
+                    println!("{:?}", files);
+                }
+            },
+            _ => panic!("command is not found")
         }
     }
+
+    let terminal_out: Vec<&str> = terminal_out.split("\n$ ").collect();
+    let terminal_out = &terminal_out[1..];
+
+    for command in terminal_out {
+        let command: Vec<&str> = command.split("\n").collect();
+        let outputs = &command[1..];
+        let command = &command[0];
+
+        process_command(&mut current_path, command, outputs);
+    }
+
+
+    output
 }
